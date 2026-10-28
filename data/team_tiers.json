@@ -1,0 +1,169 @@
+{
+ "nba": {
+  "TOP": [
+   "Oklahoma City Thunder",
+   "San Antonio Spurs",
+   "Detroit Pistons",
+   "Boston Celtics",
+   "New York Knicks",
+   "Denver Nuggets",
+   "Houston Rockets",
+   "Cleveland Cavaliers",
+   "Los Angeles Lakers"
+  ],
+  "MID": [
+   "Minnesota Timberwolves",
+   "Philadelphia 76ers",
+   "Toronto Raptors",
+   "Atlanta Hawks",
+   "Orlando Magic",
+   "Phoenix Suns",
+   "Miami Heat",
+   "Portland Trail Blazers",
+   "Charlotte Hornets",
+   "Los Angeles Clippers",
+   "Golden State Warriors",
+   "Chicago Bulls",
+   "LA Clippers"
+  ],
+  "BOT": [
+   "Milwaukee Bucks",
+   "Dallas Mavericks",
+   "Utah Jazz",
+   "New Orleans Pelicans",
+   "Memphis Grizzlies",
+   "Sacramento Kings",
+   "Brooklyn Nets",
+   "Indiana Pacers",
+   "Washington Wizards"
+  ]
+ },
+ "euroleague": {
+  "TOP": [
+   "Olympiacos",
+   "Valencia Basket",
+   "Real Madrid",
+   "Hapoel IBI Tel Aviv",
+   "Fenerbahce Beko",
+   "Zalgiris",
+   "Fenerbahce Istanbul",
+   "Hapoel Tel-Aviv",
+   "BC Olympiakos Piraeus",
+   "BC Zalgiris Kaunas"
+  ],
+  "MID": [
+   "Panathinaikos AKTOR",
+   "AS Monaco",
+   "FC Barcelona",
+   "Crvena Zvezda Meridianbet",
+   "Dubai Basketball",
+   "Besiktas JK",
+   "Maccabi Rapyd Tel Aviv",
+   "EA7 Emporio Armani Milan",
+   "FC Bayern Munich",
+   "KK Crvena zvezda Belgrade",
+   "Maccabi Tel-Aviv",
+   "Olimpia Milano",
+   "Bayern Munich",
+   "Panathinaikos BC"
+  ],
+  "BOT": [
+   "Partizan Mozzart Bet",
+   "Paris Basketball",
+   "Virtus Bologna",
+   "Kosner Baskonia",
+   "Anadolu Efes",
+   "LDLC ASVEL",
+   "ASVEL Lyon-Villeurbanne",
+   "KK Partizan Belgrade",
+   "Anadolu Efes SK",
+   "Baskonia Vitoria-Gasteiz"
+  ]
+ },
+ "acb": {
+  "TOP": [
+   "Real Madrid",
+   "Kosner Baskonia",
+   "Bar\u00e7a",
+   "UCAM Murcia",
+   "Valencia Basket",
+   "Baskonia Vitoria-Gasteiz",
+   "FC Barcelona"
+  ],
+  "MID": [
+   "Asisa Joventut",
+   "Surne Bilbao",
+   "La Laguna Tenerife",
+   "Unicaja",
+   "CB Coruna",
+   "Obradoiro CAB",
+   "Baxi Manresa",
+   "R\u00edo Breog\u00e1n",
+   "Bilbao Basket"
+  ],
+  "BOT": [
+   "B\u00e0squet Girona",
+   "Hiopos Lleida",
+   "Recoletas Salud San Pablo Burgos",
+   "Casademont Zaragoza",
+   "MoraBanc Andorra",
+   "Caprabo Lleida",
+   "CB San Pablo Burgos",
+   "Basket Zaragoza 2002",
+   "Basquet Girona"
+  ]
+ },
+ "lnb": {
+  "TOP": [
+   "Monaco",
+   "Paris Basketball",
+   "Nanterre 92",
+   "LDLC ASVEL",
+   "ASVEL Lyon-Villeurbanne"
+  ],
+  "MID": [
+   "Cholet",
+   "Le Mans Sarthe",
+   "JL Bourg",
+   "SIG Strasbourg",
+   "Elan Chalon",
+   "SLUC Nancy",
+   "JDA Dijon",
+   "Le Mans Sarthe Basket"
+  ],
+  "BOT": [
+   "Boulazac",
+   "Limoges CSP",
+   "BCM Gravelines-Dunkerque",
+   "Saint-Quentin",
+   "BCM Gravelines Dunkerque"
+  ]
+ },
+ "bbl": {
+  "TOP": [
+   "Bayern Munich",
+   "Alba Berlin",
+   "Bamberg Baskets",
+   "Telekom Baskets Bonn",
+   "W\u00fcrzburg Baskets"
+  ],
+  "MID": [
+   "Ratiopharm Ulm",
+   "Gladiators Trier",
+   "Rasta Vechta",
+   "Rostock Seawolves",
+   "Baskets Oldenburg",
+   "MHP Riesen Ludwigsburg",
+   "Riesen Ludwigsburg",
+   "TBB Trier"
+  ],
+  "BOT": [
+   "Niners Chemnitz",
+   "Syntainics MBC",
+   "Veolia Towers Hamburg",
+   "Skyliners Frankfurt",
+   "Science City Jena",
+   "Medipolis SC Jena"
+  ]
+ }
+}

@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: thebeast
+    runtime: python
+    plan: starter
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DB_PATH
+        value: /data/beast.db
+      - key: GOLD_BACKUP_PATH
+        value: /data/pinnacle_reference.json
+      - key: BEAST_DATA_DIR
+        value: /data
+      - key: RUN_SCANNER
+        value: "1"
+      - key: SOFT_BOOKS
+        value: sportybet
+      - key: LOG_LEVEL
+        value: INFO
+      - key: BANKROLL_START
+        value: "100000"
+      - key: FLAT_STAKE
+        value: "5000"
+      - key: MAX_BETS_PER_BOOK_PER_DAY
+        value: "999"
+      - key: ODDS_API_KEYS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
