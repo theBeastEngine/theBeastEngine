@@ -499,6 +499,24 @@ class Engine:
             "pin": (pins, lambda g, n: "▶" if g["t"] <= n else ("✅" if g["id"] in rev else "➖"), None),
             "both": (both, self._tracker_mark, self._tracker_note),
         }
+        # extra lists: Watchlist, Coverage gaps, Bets and results
+        watch = []
+        for g in both:
+            m = self.matches.get(g["id"])
+            c = (m["checks"][-1] if m and m.get("checks") else None)
+            if m and c and g["t"] > now and (m.get("play_keys") or c.get("status") == "seen" or c.get("why")):
+                watch.append(dict(g, note=(c.get("hint") or ((c.get("why") or [""])[0]))))
+        gaps = [dict(g, gap="s") for g in soft if g["id"] not in self.pin.link and g["t"] > now]
+        gaps += [dict(g, gap="p") for g in pins if g["id"] not in rev and g["t"] > now]
+        bets = [dict(lname=p["lname"], home=p["home"], away=p["away"], t=p["tip"], id=str(p["id"]), p=p)
+                for p in self.picks["picks"].values() if lo <= p["tip"] < hi]
+        icon = {"won": "✅", "halfwon": "✅", "lost": "❌", "halflost": "❌", "void": "➖"}
+        sets["watch"] = (watch, lambda g, n: "🟢" if (self.matches.get(g["id"]) or {}).get("play_keys") else "👀",
+                         lambda g, n: (" | " + html.escape(g["note"][:90])) if g.get("note") else "")
+        sets["gaps"] = (gaps, lambda g, n: "🔶" if g["gap"] == "s" else "🔷", None)
+        sets["bets"] = (bets, lambda g, n: icon.get(g["p"]["status"], "⏳"),
+                        lambda g, n: " | %s @ %.2f%s" % (html.escape(g["p"]["desc"]), g["p"]["odds"],
+                                                       (" | " + html.escape(str(g["p"]["score"]))) if g["p"].get("score") else ""))
         for kind, (games, mark, extra) in sets.items():
             pages = board.render(kind, now, games, mark, extra)
             for i, text in enumerate(pages, 1):

@@ -10,9 +10,10 @@ from tennis import cfg
 from tennis.cards import RULE, clock, local
 
 e = html.escape
-LISTS = ("sporty", "pin", "both")
-TITLE = {"sporty": "SportyBet List", "pin": "Pinnacle List", "both": "Pinnacle + SportyBet List"}
-ICON = {"sporty": "🟦", "pin": "🟧", "both": "🟩"}
+LISTS = ("sporty", "pin", "both", "watch", "gaps", "bets")
+TITLE = {"sporty": "SportyBet List", "pin": "Pinnacle List", "both": "Pinnacle + SportyBet List",
+         "watch": "Watchlist", "gaps": "Coverage Gaps", "bets": "Bets and Results"}
+ICON = {"sporty": "🟦", "pin": "🟧", "both": "🟩", "watch": "🟨", "gaps": "🟥", "bets": "🟪"}
 LIMIT = 3600
 
 
@@ -93,6 +94,9 @@ def render(kind: str, now: float, games: list, mark, extra=None, limit: int = LI
         "sporty": "✅ has a Pinnacle price | ➖ not matched yet | ▶ started",
         "pin": "✅ on SportyBet | ➖ not on SportyBet | ▶ started",
         "both": "🟢 bet signal | 👀 tracker running | ⏳ tracker not started yet | ▶ started",
+        "watch": "Matches the tracker has seen a market on, or that came close. 👀 seen once | 🟢 bet signal",
+        "gaps": "🔶 on SportyBet, no Pinnacle price | 🔷 on Pinnacle, not on SportyBet",
+        "bets": "⏳ open | ✅ won | ❌ lost | ➖ void",
     }[kind]
     intro_line = "%d matches in %d leagues | %s\n%s" % (len(games), len(by), "06:00 to 06:00 WAT. Updates itself through the day.", legend)
     rows = []

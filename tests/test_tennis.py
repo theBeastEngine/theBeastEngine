@@ -725,3 +725,16 @@ def test_tracker_starts_eight_hours_before_the_match_and_t5_needs_a_bet_signal()
     clock[0] = last["t"] + 1
     eng.tick()
     assert last["done"] and not any("T-5" in x["text"] for x in sent[n:])   # no T-5 card without a signal
+
+
+def test_extra_lists_watchlist_gaps_and_bets_are_posted():
+    eng, feed, pn, res, sent, edits, plain, clock, ev = rig()
+    other = dict(ev, id="sr:match:10", home="Solo, A", away="Lone, B", t=ev["t"] + 900)
+    feed.events[other["id"]] = other                                     # on SportyBet, Pinnacle has nothing
+    pn.index = {"tennis_atp_paris": dict(t=NOW, events=[("p1", "Novak Djokovic", "Carlos Alcaraz", ev["t"]), ("p9", "X", "Y", ev["t"] + 300)])}
+    at(eng, clock, NOW)
+    at(eng, clock, [s for s in list(eng.matches.values())[0]["slots"]][1]["t"] + 1)
+    c = eng.cards.d
+    assert {"tn_board:watch:1", "tn_board:gaps:1", "tn_board:bets:1"} <= set(c)
+    assert "Solo" in c["tn_board:gaps:1"] and "X vs Y" in c["tn_board:gaps:1"] and "Djokovic" not in c["tn_board:gaps:1"]
+    assert "Bets and Results: " in c["tn_board:bets:1"]
