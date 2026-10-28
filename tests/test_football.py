@@ -415,3 +415,14 @@ def test_football_board_posts_the_six_lists_and_tracker_starts_eight_hours_out()
     clk2[0] = NOW + 12 * 3600 + 5
     far.tick()
     assert len(far.matches) == 1
+
+
+def test_zero_handicap_line_is_printed_once_on_the_card():
+    from football import cards, model
+    soft = dict(markets={"1x2": {"home": 2.55, "draw": 3.50, "away": 2.70}, "ah": {0.0: {"home": 1.83, "away": 1.95}}})
+    pin = dict(markets={"1x2": {"home": 2.56, "draw": 3.66, "away": 2.98}, "ah": {0.0: {"home": 1.85, "away": 2.18}}})
+    cs = model.candidates(soft, pin)
+    tb = cards.compare_table(cs, "Atletico Mineiro MG", "Cruzeiro EC MG", None)
+    labels = [lab for head, rows in tb if head.startswith("ASIAN") for lab, *_ in rows]
+    assert labels and all(lab.endswith(" 0") and not lab.endswith(" 0 0") for lab in labels), labels
+    assert not any(" 0 0" in x for x in cards.chances(tb))

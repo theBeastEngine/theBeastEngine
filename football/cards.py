@@ -102,7 +102,7 @@ def compare_table(cands: list, home: str, away: str, soft_1x2) -> list:
         same = cs if fam == "1x2" else [c for c in cs if c["line"] == best["line"]]
         rows = []
         for c in sorted(same, key=lambda c: order.get(c["sel"], 3)):
-            d = model.describe(c, home, away).replace(" to win", "").replace(" goals", "").replace(" (draw no bet)", " 0")
+            d = model.describe(c, home, away).replace(" to win", "").replace(" goals", "").replace(" (draw no bet)", "")
             rows.append((d, c["odds"], c["fair_odds"], c["ev"]))
         out.append((head, rows))
     return out
