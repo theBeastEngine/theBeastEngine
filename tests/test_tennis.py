@@ -158,11 +158,15 @@ class Cards:
     def __init__(self):
         self.d = {}
 
-    def put(self, key, text, day, silent=True, data=None):
+    def put(self, key, text, day, silent=True, data=None, reply_to=None):
         self.d[key] = text
+        self.replies = getattr(self, "replies", {})
+        self.replies[key] = reply_to
+        self.ids = getattr(self, "ids", {})
+        self.ids.setdefault(key, 500 + len(self.ids))
 
     def get(self, key):
-        return {}
+        return {"msg_id": getattr(self, "ids", {}).get(key)} if key in getattr(self, "ids", {}) else {}
 
     def _st(self):
         return {}
@@ -669,3 +673,55 @@ def test_sources_probe_reports_reachable_and_failing_feeds():
     assert "OK   ESPN football England: 1 games, 1 finished, e.g. Arsenal 2 | Chelsea 1" in txt
     assert "FAIL ESPN tennis WTA: HTTP 403" in txt
     assert "OK   TheSportsDB football: 2 games, 1 with a final score, e.g. A 3-1 B" in txt
+
+
+# ------------------------------------------------------------------ daily board
+def test_board_day_runs_six_to_six_wat_and_titles_use_ordinals():
+    from tennis import board
+    import calendar
+    t = calendar.timegm((2026, 10, 28, 4, 30, 0))          # 05:30 WAT is still the 27th's board day
+    assert board.board_day(t) == "20261027" and board.date_text(t) == "27th October 2026"
+    t = calendar.timegm((2026, 10, 28, 5, 0, 0))           # 06:00 WAT starts the 28th
+    assert board.board_day(t) == "20261028" and board.date_text(t) == "28th October 2026"
+    lo, hi = board.bracket(t)
+    assert lo == t and hi - lo == 86400
+    assert [board.ordinal(n) for n in (1, 2, 3, 11, 12, 13, 21, 22, 23, 30)] == ["1st", "2nd", "3rd", "11th", "12th", "13th", "21st", "22nd", "23rd", "30th"]
+
+
+def test_board_long_list_continues_on_numbered_pages_with_a_way_back():
+    from tennis import board
+    t = NOW
+    games = [dict(id=str(i), lname="League %d" % (i // 20), home="Player %d" % i, away="Other %d" % i, t=t + i * 60) for i in range(150)]
+    pages = board.render("pin", t, games, lambda g, n: "✅", limit=1500)
+    assert len(pages) > 1 and all(len(p) < 1500 for p in pages)
+    assert "(Page 1)" in pages[0] and "(Page 2)" in pages[1] and "Page 1" in pages[1] and "Continues on Page 2" in pages[0]
+    assert "Continues" not in pages[-1]
+    assert sum(p.count(" vs ") for p in pages) == 150                      # nothing lost across pages
+    one = board.render("sporty", t, games[:5], lambda g, n: "✅")
+    assert len(one) == 1 and "(Page" not in one[0] and "SportyBet List: " in one[0]
+
+
+def test_engine_board_posts_three_lists_and_pages_reply_to_the_page_before():
+    eng, feed, pn, res, sent, edits, plain, clock, ev = rig()
+    pn.index = {"tennis_atp_paris": dict(t=NOW, events=[("p1", "Novak Djokovic", "Carlos Alcaraz", ev["t"]), ("p2", "A", "B", ev["t"] + 600)])}
+    at(eng, clock, NOW)
+    c = eng.cards
+    assert {"tn_board:sporty:1", "tn_board:pin:1", "tn_board:both:1"} <= set(c.d)
+    assert "Djokovic" in c.d["tn_board:sporty:1"] and "Paris" in c.d["tn_board:pin:1"].replace("Atp Paris", "Paris")
+    assert "tracker from" in c.d["tn_board:both:1"] or "👀" in c.d["tn_board:both:1"]
+
+
+def test_tracker_starts_eight_hours_before_the_match_and_t5_needs_a_bet_signal():
+    eng, feed, pn, res, sent, edits, plain, clock, ev = rig(tip_in=20 * 3600)
+    at(eng, clock, NOW)
+    assert not eng.matches                                                  # too early
+    clock[0] = NOW + 12 * 3600 + 5
+    eng.tick()
+    assert len(eng.matches) == 1
+    m = list(eng.matches.values())[0]
+    last = [s for s in m["slots"] if s["kind"] == "last"][0]
+    m["play_keys"] = []
+    n = len(sent)
+    clock[0] = last["t"] + 1
+    eng.tick()
+    assert last["done"] and not any("T-5" in x["text"] for x in sent[n:])   # no T-5 card without a signal

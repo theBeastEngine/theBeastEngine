@@ -40,7 +40,7 @@ class TennisRuntime:
         papi = op.OddsPapi() if op.keys_from_env() else None
         pin = PinBook(oa_client=oa.OddsAPI(), papi_client=papi, load=repo.kv_get, save=repo.kv_set)
         cards = livecards.LiveCards(load=lambda: repo.kv_get(CARDS_KEY), save=lambda v: repo.kv_set(CARDS_KEY, v),
-                                    send=lambda t, silent: tg.send(t, None, None, silent), edit=lambda mid, t: tg.edit(mid, t))
+                                    send=lambda t, silent, reply_to=None: tg.send(t, None, reply_to, silent), edit=lambda mid, t: tg.edit(mid, t))
         self.engine = Engine(repo.kv_get, repo.kv_set, SportyFeed(), pin, Results(oa=oa.OddsAPI()), tg.send, tg.edit, tg.plain, cards,
                              cplog=CPLog(load=lambda: repo.kv_get(CP_KEY), save=lambda v: repo.kv_set(CP_KEY, v)))
         return self.engine

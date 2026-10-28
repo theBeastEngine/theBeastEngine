@@ -47,14 +47,17 @@ class LiveCards:
         except Exception as e:
             log.warning("live cards not saved: %s", e)
 
-    def _tg_send(self, text, silent):
+    def _tg_send(self, text, silent, reply_to=None):
         if self._send:
-            return self._send(text, silent)
+            return self._send(text, silent, reply_to) if reply_to else self._send(text, silent)
         from core import telegram_notify as tn
         from config.settings import settings
         payload = dict(chat_id=settings.TELEGRAM_CHAT_ID, text=text[:4000], parse_mode="HTML")
         if silent:
             payload["disable_notification"] = True
+        if reply_to:
+            payload["reply_to_message_id"] = reply_to
+            payload["allow_sending_without_reply"] = True
         res = tn.api("sendMessage", **payload)
         return ((res or {}).get("result") or {}).get("message_id")
 
@@ -78,7 +81,7 @@ class LiveCards:
     def get(self, key: str) -> dict:
         return self._st().get(key) or {}
 
-    def put(self, key: str, text: str, day: str, silent: bool = True, data: dict = None) -> str:
+    def put(self, key: str, text: str, day: str, silent: bool = True, data: dict = None, reply_to=None) -> str:
         """Returns 'sent', 'edited' or '' (unchanged / failed). data: small dict stored with the card (for the caller)."""
         if not text:
             return ""
@@ -103,7 +106,7 @@ class LiveCards:
                     c.update(h=hh, t=now)
                     self._dirty = True
                     return "edited"
-            mid = self._tg_send(text, silent)
+            mid = self._tg_send(text, silent, reply_to)
             if not mid:
                 return ""
             st[key] = dict(day=day, msg_id=mid, h=hh, t=now, data=data if data is not None else {})
