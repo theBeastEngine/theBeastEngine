@@ -144,7 +144,7 @@ class Cards:
     def __init__(self):
         self.d = {}
 
-    def put(self, key, text, day, silent=True, data=None):
+    def put(self, key, text, day, silent=True, data=None, reply_to=None):
         self.d[key] = text
 
     def get(self, key):
@@ -397,3 +397,21 @@ def test_football_card_lists_pinnacle_chances_for_every_market_and_a_plain_read(
     rd = cards.match_read(tb)
     assert "Arsenal is the favourite, about 58% to win; a draw is about" in rd and "normal number of goals" in rd
     assert cards.match_read([("MATCH RESULT (1X2)", [("A", 2.0, None, None), ("D", 3.0, None, None), ("B", 3.0, None, None)])]) == ""
+
+
+def test_football_board_posts_the_six_lists_and_tracker_starts_eight_hours_out():
+    eng, feed, pn, res, sent, edits, plain, clock, ev = rig()
+    pn.index = {"soccer_epl": dict(t=NOW, events=[("p1", "Arsenal", "Chelsea", ev["t"]), ("p2", "X FC", "Y FC", ev["t"] + 600)])}
+    other = dict(ev, id="sr:match:2", home="Solo FC", away="Lone FC", t=ev["t"] + 900)
+    feed.events[other["id"]] = other
+    at(eng, clock, NOW)
+    c = eng.cards.d
+    assert {"fb_board:sporty:1", "fb_board:pin:1", "fb_board:both:1", "fb_board:watch:1", "fb_board:gaps:1", "fb_board:bets:1"} <= set(c)
+    assert "Arsenal" in c["fb_board:sporty:1"] and "Premier League" not in c["fb_board:pin:1"] or "Epl" in c["fb_board:pin:1"]
+    assert "Solo FC" in c["fb_board:gaps:1"] and "X FC vs Y FC" in c["fb_board:gaps:1"]
+    far, f2, p2, r2, s2, e2, pl2, clk2, ev2 = rig(tip_in=20 * 3600)
+    at(far, clk2, NOW)
+    assert not far.matches                                            # too early: tracker starts 8 hours before
+    clk2[0] = NOW + 12 * 3600 + 5
+    far.tick()
+    assert len(far.matches) == 1

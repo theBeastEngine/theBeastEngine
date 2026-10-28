@@ -8,6 +8,7 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 
+from core import board
 from football import cards, cfg, model
 from football.cards import LATE, local, clock
 
@@ -33,6 +34,7 @@ class Engine:
         self.paused = False
         self._last_index = 0.0
         self._last_agenda = 0.0
+        self._last_board = 0.0
         self.errors = []
 
     # ---------------------------------------------------------------- state
@@ -147,9 +149,9 @@ class Engine:
         for k in [k for k, v in self.matches.items() if v["tip"] < now - KEEP_S]:
             del self.matches[k]
         try:
-            self.agenda(now)
+            self.board(now)
         except Exception as e:
-            self._err("agenda failed: %s" % e)
+            self._err("board failed: %s" % e)
         self.flush()
 
     def _err(self, text):
@@ -160,6 +162,8 @@ class Engine:
         for ev in events:
             if ev["id"] in self.matches or ev["id"] not in self.pin.link or ev["t"] <= now:
                 continue
+            if ev["t"] - now > cfg.f("FB_TRACKER_H", 8) * 3600:
+                continue                                  # the tracker starts 8 hours before the match
             self.matches[ev["id"]] = dict(key=ev["id"], soft_id=ev["id"], lid=ev["lid"], lname=ev["lname"], home=ev["home"],
                                           away=ev["away"], tip=ev["t"], checks=[], play_keys=[], picks={},
                                           slots=cards.plan_slots(now, ev["t"]), msg_id=None, skipped=False, pinged=False)
@@ -167,6 +171,13 @@ class Engine:
     # ---------------------------------------------------------------- one check
     def _check(self, m: dict, now: float):
         due = [s for s in m["slots"] if not s["done"] and s["t"] <= now]
+        if not m["play_keys"] and not cfg.on("FB_LAST_LOOK_ALWAYS", "0"):
+            for s in due:
+                if s["kind"] == "last":
+                    s["done"] = True                      # T-5 is only for a match that has a live bet signal
+            due = [s for s in due if not s["done"]]
+            if not due:
+                return
         slot = due[-1]
         for s in due:
             s["done"] = True
@@ -404,6 +415,87 @@ class Engine:
         for i, text in enumerate(cards.agenda(now, st["games"], self.priced)):
             self.cards.put("fb_agenda:%d" % i, text, day)
         self.meta["agenda"] = st
+
+    def _tracker_mark(self, g, now):
+        m = self.matches.get(g["id"])
+        if g["t"] <= now:
+            return "▶"
+        if m and m.get("play_keys"):
+            return "🟢"
+        if m and not m.get("skipped"):
+            return "👀"
+        return "⏳"
+
+    def _tracker_note(self, g, now):
+        m = self.matches.get(g["id"])
+        if g["t"] <= now or m:
+            return ""
+        return " (tracker from %s)" % cards.clock(g["t"] - cfg.f("FB_TRACKER_H", 8) * 3600)
+
+    def board(self, now: float, force: bool = False):
+        """Three lists for the 06:00-06:00 day, each on its own card(s), edited through the day. Pages after the first
+        reply to the page before so one tap jumps back."""
+        self._load()
+        if not force and now - self._last_board < cfg.f("FB_BOARD_MIN", 10) * 60:
+            return
+        self._last_board = now
+        day = board.board_day(now)
+        lo, hi = board.bracket(now)
+        st = self.meta.get("board") or {}
+        if st.get("day") != day:
+            st = dict(day=day, soft={}, pin={}, pages={})
+        for ev in list(self.feed.events.values()):
+            if lo <= ev["t"] < hi:
+                st["soft"][ev["id"]] = dict(id=ev["id"], lname=ev["lname"], home=ev["home"], away=ev["away"], t=ev["t"])
+        rev = {}
+        for sid, v in self.pin.link.items():
+            try:
+                rev[str(v[1])] = sid
+            except Exception:
+                pass
+        for k, ix in list(getattr(self.pin, "index", {}).items()):
+            for pid, h, a, t in ix.get("events", []):
+                if t and h and a and lo <= t < hi:
+                    st["pin"][str(pid)] = dict(id=str(pid), lname=board.pretty_key(k), home=h, away=a, t=t)
+        soft = list(st["soft"].values())
+        pins = list(st["pin"].values())
+        both = [g for g in soft if g["id"] in self.pin.link]
+        sets = {
+            "sporty": (soft, lambda g, n: "▶" if g["t"] <= n else ("✅" if g["id"] in self.pin.link else "➖"), None),
+            "pin": (pins, lambda g, n: "▶" if g["t"] <= n else ("✅" if g["id"] in rev else "➖"), None),
+            "both": (both, self._tracker_mark, self._tracker_note),
+        }
+        # extra lists: Watchlist, Coverage gaps, Bets and results
+        watch = []
+        for g in both:
+            m = self.matches.get(g["id"])
+            c = (m["checks"][-1] if m and m.get("checks") else None)
+            if m and c and g["t"] > now and (m.get("play_keys") or c.get("status") == "seen" or c.get("why")):
+                watch.append(dict(g, note=(c.get("hint") or ((c.get("why") or [""])[0]))))
+        gaps = [dict(g, gap="s") for g in soft if g["id"] not in self.pin.link and g["t"] > now]
+        gaps += [dict(g, gap="p") for g in pins if g["id"] not in rev and g["t"] > now]
+        bets = [dict(lname=p["lname"], home=p["home"], away=p["away"], t=p["tip"], id=str(p["id"]), p=p)
+                for p in self.picks["picks"].values() if lo <= p["tip"] < hi]
+        icon = {"won": "✅", "halfwon": "✅", "lost": "❌", "halflost": "❌", "void": "➖"}
+        sets["watch"] = (watch, lambda g, n: "🟢" if (self.matches.get(g["id"]) or {}).get("play_keys") else "👀",
+                         lambda g, n: (" | " + html.escape(g["note"][:90])) if g.get("note") else "")
+        sets["gaps"] = (gaps, lambda g, n: "🔶" if g["gap"] == "s" else "🔷", None)
+        sets["bets"] = (bets, lambda g, n: icon.get(g["p"]["status"], "⏳"),
+                        lambda g, n: " | %s @ %.2f%s" % (html.escape(g["p"]["desc"]), g["p"]["odds"],
+                                                       (" | " + html.escape(str(g["p"]["score"]))) if g["p"].get("score") else ""))
+        for kind, (games, mark, extra) in sets.items():
+            pages = board.render(kind, now, games, mark, extra)
+            for i, text in enumerate(pages, 1):
+                key = "fb_board:%s:%d" % (kind, i)
+                reply = self.cards.get("fb_board:%s:%d" % (kind, i - 1)).get("msg_id") if i > 1 else None
+                if reply:
+                    self.cards.put(key, text, day, True, None, reply)
+                else:
+                    self.cards.put(key, text, day)
+            for j in range(len(pages) + 1, int(st["pages"].get(kind, 0)) + 1):
+                self.cards.put("fb_board:%s:%d" % (kind, j), board.empty_page(kind, now, j), day)
+            st["pages"][kind] = len(pages)
+        self.meta["board"] = st
 
     # ---------------------------------------------------------------- numbers
     def stats(self) -> dict:
