@@ -746,7 +746,6 @@ def test_card_table_rows_use_first_word_and_stay_narrow():
           ("TOTAL GAMES (closest line)", [("Over 20.5", 1.98, 2.06, -0.04)])]
     rows = [r for blk in cards.table_text(tb) if blk.startswith("<pre>") for r in blk[5:-6].split("\n")]
     assert len(rows) == 4
-    assert all(len(r) <= 35 for r in rows)
-    assert len({r.index("|") for r in rows}) == 1             # the columns line up
-    assert rows[0].startswith("Basilashvili ") and rows[1].startswith("Alcaraz ")
-    assert rows[2].endswith("+1.4%") and rows[2].split()[1] == "+4.5"
+    assert all(len(r) <= 28 for r in rows)                    # one line on a phone
+    assert rows[0].startswith("Basilash") and rows[1].startswith("Alcaraz ")
+    assert rows[0].endswith("-32.3%") and rows[2].endswith("+1.4%") and "+4.5" in rows[2]

@@ -5,6 +5,7 @@ import html
 import re
 from datetime import datetime, timedelta, timezone
 
+from core import table as _table
 from tennis import cfg, model
 
 RULE = "━" * 15
@@ -126,23 +127,8 @@ def plain_result(cands: list, elig: list, home: str, away: str) -> str:
     return "NO BET. Closest to a bet: %s. Edge %+.1f%% but blocked: %s." % (what, 100 * c["ev"], c["why_not"])
 
 
-def _label(lab: str) -> str:
-    """Player rows show the first word of the name (the surname) plus any trailing line or score, so every row stays narrow."""
-    tok = (lab or "").split()
-    if len(tok) < 2 or tok[0] in ("Over", "Under", "Odd", "Even") or tok[0][:1].isdigit():
-        return (lab or "").strip()
-    return tok[0] + (" " + tok[-1] if re.search(r"\d", tok[-1]) else "")
-
-
 def table_text(table: list) -> list:
-    L = []
-    for head, rows in table or []:
-        L.append("<b>%s</b>" % head)
-        t = []
-        for lab, odds, fair, ev in rows:
-            t.append("%-12s %5.2f | %5s | %6s" % (_short(_label(lab), 12), odds, ("%.2f" % fair) if fair else "-", ("%+.1f%%" % (100 * ev)) if ev is not None else "-"))
-        L.append("<pre>%s</pre>" % e("\n".join(t)))
-    return L
+    return _table.table_text(table)
 
 
 def match_read(table: list) -> str:

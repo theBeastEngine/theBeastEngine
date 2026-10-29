@@ -5,6 +5,7 @@ import html
 import re
 from datetime import datetime, timedelta, timezone
 
+from core import table as _table
 from football import cfg, model
 
 RULE = "━" * 15
@@ -124,14 +125,7 @@ def plain_result(cands: list, elig: list, home: str, away: str) -> str:
 
 
 def table_text(table: list) -> list:
-    L = []
-    for head, rows in table or []:
-        L.append("<b>%s</b>" % head)
-        t = []
-        for lab, odds, fair, ev in rows:
-            t.append("%-16s %5.2f | %5s | %6s" % (_short(lab, 16), odds, ("%.2f" % fair) if fair else "-", ("%+.1f%%" % (100 * ev)) if ev is not None else "-"))
-        L.append("<pre>%s</pre>" % e("\n".join(t)))
-    return L
+    return _table.table_text(table)
 
 
 def chances(table: list) -> list:
