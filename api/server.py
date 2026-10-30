@@ -23,6 +23,10 @@ async def lifespan(app: FastAPI):
         from football.runtime import FootballRuntime   # a separate service: own database, own Telegram bot
         _runtime = FootballRuntime()
         _runtime.start()
+    elif sport in ("ice_hockey", "hockey"):
+        from hockey.runtime import HockeyRuntime       # a separate service: own database, own Telegram bot
+        _runtime = HockeyRuntime()
+        _runtime.start()
     elif sport == "tennis":
         from tennis.runtime import TennisRuntime       # a separate service: own database, own Telegram bot
         _runtime = TennisRuntime()
