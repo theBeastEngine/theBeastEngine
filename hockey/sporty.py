@@ -19,7 +19,8 @@ from services.client import get_json, HttpError
 log = logging.getLogger("hockey.sporty")
 URL = os.getenv("SPORTYBET_URL", "https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents")
 HEADERS = {"operid": "2", "clientid": "web", "platform": "web", "Referer": "https://www.sportybet.com/ng/"}
-MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "219,223,225")   # the book rejects an empty list with 100 per page (HTTP 422): the all-markets look is a separate small probe
+MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "1,16,18,219,223,225,406,410,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450")   # wide list: ids that do not exist for hockey simply return nothing; names decide what is used.
+# the book rejects an empty list with 100 per page (HTTP 422): the all-markets look is a separate small probe
 PAGE_SIZE = int(os.getenv("HK_SPORTY_PAGE_SIZE", "100"))
 SEEN = Counter()                      # (market id, market name) -> times seen: proof of what the book calls them
 _BAD_NAME = ("3-way", "3 way", "three way", "regulation", "regular", "period", "1st", "2nd", "3rd", "team total", "exact", "odd",
@@ -182,15 +183,25 @@ class SportyFeed:
         if now - self._probe_t < 3600:
             return
         self._probe_t = now
-        try:
-            payload, _ = self._get(URL, {"sportId": "sr:sport:4", "marketId": "", "pageSize": 30, "pageNum": 1,
-                                         "todayGames": "false", "timeline": ""}, HEADERS, 20, 1)
-            data = (payload or {}).get("data")
-            for t in (data.get("tournaments") if isinstance(data, dict) else data) or []:
-                for ev in (t.get("events") or [] if isinstance(t, dict) else []):
-                    parse_markets(ev.get("markets"))
-        except Exception as e:
-            log.warning("sportybet hockey market probe failed: %s", str(e)[:120])
+        tries = [{"marketId": "", "pageSize": 30}, {"pageSize": 10}, {"marketId": "1,16,18", "pageSize": 20}]
+        errs = []
+        for extra in tries:
+            try:
+                params = {"sportId": "sr:sport:4", "pageNum": 1, "todayGames": "false", "timeline": ""}
+                params.update(extra)
+                payload, _ = self._get(URL, params, HEADERS, 20, 1)
+                data = (payload or {}).get("data")
+                n = 0
+                for t in (data.get("tournaments") if isinstance(data, dict) else data) or []:
+                    for ev in (t.get("events") or [] if isinstance(t, dict) else []):
+                        parse_markets(ev.get("markets"))
+                        n += 1
+                self.last["probe"] = "ok (%d games, request %s)" % (n, sorted(extra))
+                return
+            except Exception as e:
+                errs.append("%s: %s" % (sorted(extra), str(e)[:60]))
+                log.warning("sportybet hockey market probe failed: %s", errs[-1])
+        self.last["probe"] = "failed: " + " | ".join(errs)
 
     def _sweep(self, today: bool) -> int:
         n_ev, pages = 0, 0

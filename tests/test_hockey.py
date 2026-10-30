@@ -253,5 +253,7 @@ def test_probe_records_market_names_and_never_raises():
 
     def boom(*a, **k):
         raise RuntimeError("x")
-    sporty.SportyFeed(get=boom).probe(NOW)
-    assert sporty.MARKET_IDS == "219,223,225"
+    f2 = sporty.SportyFeed(get=boom)
+    f2.probe(NOW)
+    assert f2.last["probe"].startswith("failed")
+    assert "219" in sporty.MARKET_IDS and "406" in sporty.MARKET_IDS and f.last.get("probe", "").startswith("ok")
