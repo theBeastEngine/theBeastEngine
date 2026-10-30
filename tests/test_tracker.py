@@ -387,3 +387,50 @@ def test_checkpoint_verdicts_are_logged(rig):
     tick(tr, clock, TIP - 1800 + 5)
     v = list(tr.cplog._d().values())[0]["v"]
     assert v["t60"][0] == "play" and v["final"][0] == "skip"
+
+
+def _table_rows():
+    r = lambda m, s, ln, o, f, ev: dict(market=m, selection=s, line=ln, odds=o, p=1 / f, fair_odds=f, ev=ev)
+    return [r("h2h", "home", None, 1.20, 1.18, 0.017), r("h2h", "away", None, 4.00, 4.60, -0.13),
+            r("spreads", "home", -10.5, 1.85, 1.90, -0.026), r("spreads", "away", -10.5, 1.85, 1.90, -0.026),
+            r("totals", "over", 201.5, 1.85, 1.88, -0.016), r("totals", "under", 201.5, 1.85, 1.92, -0.036)]
+
+
+def test_watch_card_uses_the_price_table_layout_like_tennis_and_football(rig):
+    tr, beast, repo, sent, edits, clock, store = rig
+    beast.pinref.table_rows = lambda ev: _table_rows()
+    beast.pinref.pin = _pin(total=201.5, spread=-10.5)
+    tick(tr, clock, T0)
+    t = sent[0]["text"]
+    assert "WATCH (no edge yet)" in t and "NO BET. Closest to a bet: Melbourne United to win (SportyBet 1.20, Pinnacle fair 1.18)" in t
+    assert "Price columns: SportyBet | Pinnacle fair | edge" in t and "<b>MONEYLINE</b>" in t and "<b>SPREAD (closest line)</b>" in t
+    assert "<b>TOTAL POINTS (closest line)</b>" in t and "Pinnacle's chances" in t and "Read: " in t
+    assert "Melbourne" in t and "+1.7%" in t and "Total: 0.0 | Spread: 0.0" in t and "Injuries: none found" in t
+    assert "Moneyline: 1.20" not in t                                 # the old Pinnacle / SportyBet lines are replaced by the table
+    pre = [r for blk in t.split("<pre>")[1:] for r in blk.split("</pre>")[0].split("\n")]
+    assert pre and all(len(r) <= 28 for r in pre)                      # every row fits one line on a phone
+    assert not repo.picks
+
+
+def test_card_falls_back_to_the_old_lines_when_the_price_table_cannot_be_built(rig):
+    tr, beast, repo, sent, edits, clock, store = rig
+
+    def boom(ev):
+        raise RuntimeError("no table today")
+
+    beast.pinref.table_rows = boom
+    tick(tr, clock, T0)
+    t = sent[0]["text"]
+    assert "WATCH (no edge yet)" in t and "Total: +0.5" in t and "Price columns" not in t
+
+
+def test_table_card_survives_a_restart(rig):
+    tr, beast, repo, sent, edits, clock, store = rig
+    beast.pinref.table_rows = lambda ev: _table_rows()
+    beast.pinref.pin = _pin(total=201.5, spread=-10.5)
+    tick(tr, clock, T0)
+    tr2 = MatchTracker(beast, load=lambda: store.get("v"), save=lambda v: store.__setitem__("v", v),
+                       send=lambda *a: 999, edit=lambda *a: True, now=lambda: clock[0], repo=repo)
+    key = next(iter(tr2._state()["matches"]))
+    text = tr2.render(tr2._state()["matches"][key])
+    assert "<b>MONEYLINE</b>" in text and "Pinnacle's chances" in text

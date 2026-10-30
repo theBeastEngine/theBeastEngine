@@ -11,6 +11,7 @@ import re
 WIDTH = 12          # longest label ever asked for
 LINE = 28           # widest row that fits on one line of a phone chat bubble
 _KEEP = ("Over", "Under", "Odd", "Even", "Draw")
+_GENERIC = ("united", "city", "town", "rovers", "athletic", "wanderers", "state", "club", "university")   # not a team name on their own
 
 
 def short(name: str, n: int = WIDTH) -> str:
@@ -25,16 +26,20 @@ def short(name: str, n: int = WIDTH) -> str:
     return name[:n - 1] + "."
 
 
-def first_name(label: str) -> str:
-    """First word of a player or team name (tags of up to 3 letters such as CR, EC, MG, de, van are skipped), plus any trailing line or score."""
+def first_name(label: str, last: bool = False) -> str:
+    """First word of a player or team name (tags of up to 3 letters such as CR, EC, MG, de, van are skipped), plus any trailing line or score.
+    last=True takes the last long word instead: basketball teams are known by the nickname (Los Angeles Lakers -> Lakers)."""
     lab = (label or "").strip()
     tok = lab.split()
     if len(tok) < 2 or tok[0] in _KEEP or tok[0][:1].isdigit():
         return lab
-    tail = tok[-1] if re.search(r"\d", tok[-1]) else ""
+    tail = tok[-1] if re.fullmatch(r"[+-]?\d+(?:[.:]\d+)?", tok[-1]) else ""
     words = tok[:-1] if tail else tok
     words = [w for w in words if len(w) > 3] or words
-    return words[0] + (" " + tail if tail else "")
+    w = words[0]
+    if last:
+        w = words[-1] if (words[-1].lower() not in _GENERIC or len(words) == 1) else words[0]
+    return w + (" " + tail if tail else "")
 
 
 def _tail(f: str) -> str:
@@ -42,9 +47,9 @@ def _tail(f: str) -> str:
     return " " + m.group(1) if m else ""
 
 
-def labels(rows: list) -> list:
+def labels(rows: list, last: bool = False) -> list:
     """Short label for each row of one market. If two rows share the same first word (Manchester United / Manchester City), add the next word's initial."""
-    firsts = [first_name(r[0]) for r in rows]
+    firsts = [first_name(r[0], last) for r in rows]
     bare = [re.sub(r"\s+[+-]?[\d.:]+$", "", f) for f in firsts]
     fulls = [(r[0] or "").strip() for r in rows]
     if len(rows) > 1 and len(set(bare)) < len(set(fulls)):
@@ -56,7 +61,7 @@ def labels(rows: list) -> list:
     return [short(f) for f in firsts]
 
 
-def table_text(table: list) -> list:
+def table_text(table: list, last: bool = False) -> list:
     L = []
     for head, rows in table or []:
         L.append("<b>%s</b>" % head)
@@ -65,6 +70,6 @@ def table_text(table: list) -> list:
         edge = [("%+.1f%%" % (100 * r[3])) if r[3] is not None else "-" for r in rows]
         wo, wf, we = max(map(len, odds)), max(map(len, fair)), max(map(len, edge))
         wl = max(6, min(WIDTH, LINE - (wo + wf + we + 3)))        # the name gets whatever room the numbers leave
-        t = ["%-*s %*s|%*s|%*s" % (wl, short(lab, wl), wo, o, wf, f, we, g) for lab, o, f, g in zip(labels(rows), odds, fair, edge)]
+        t = ["%-*s %*s|%*s|%*s" % (wl, short(lab, wl), wo, o, wf, f, we, g) for lab, o, f, g in zip(labels(rows, last), odds, fair, edge)]
         L.append("<pre>%s</pre>" % html.escape("\n".join(t)))
     return L

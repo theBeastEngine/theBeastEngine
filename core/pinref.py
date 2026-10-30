@@ -882,6 +882,33 @@ class PinRef:
         return None
 
     # --- candidates ---
+    def table_rows(self, ev) -> list:
+        """Every full-game SportyBet side that has a Pinnacle fair price on the same line, qualifying or not (feeds the price table
+        on the match card; unlike candidates() nothing is filtered out and nothing is sent anywhere)."""
+        pin = self.match(ev)
+        if not pin or self.mismatch(ev):
+            return []
+        fair = fair_probs(pin)
+        groups = {}
+        for m, outs in ev.get("markets", {}).items():
+            if m not in ("h2h", "spreads", "totals"):
+                continue
+            for o in outs:
+                if o["book"] == PINNACLE:
+                    continue
+                groups.setdefault((o["book"], m, _ln(o.get("line"))), {})[o["selection"]] = o["odds"]
+        out = []
+        for (book, m, ln), sides in groups.items():
+            f = fair.get((m, ln))
+            if not f:
+                continue
+            for sel, odds in sides.items():
+                p = f.get(sel)
+                if not p or odds <= 1:
+                    continue
+                out.append(dict(market=m, selection=sel, line=ln, odds=odds, p=p, fair_odds=round(1 / p, 3), ev=edge(p, odds), book=book))
+        return out
+
     def candidates(self, ev, near=None) -> list:
         """near: optional list that also receives edges that did NOT qualify (digest 'closest to qualifying')."""
         pin = self.match(ev)

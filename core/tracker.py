@@ -16,6 +16,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 
+from core import bbcards
 from core.pinref import _ln, PINNACLE
 from services.logger import get_logger
 
@@ -360,6 +361,17 @@ class MatchTracker:
                 self.shadow.record(m.get("key") or match_key(ev), ev, edges, near)
         except Exception as e:
             log.warning("tracker shadow pick failed: %s", e)
+        try:
+            rows = self.beast.pinref.table_rows(ev) if pin else []
+            lo, hi = total_range(ev.get("league"))
+            rows = [r for r in rows if r.get("market") != "totals" or (r.get("line") is not None and lo <= r["line"] <= hi)]
+            if rows:
+                from config.settings import settings
+                chk["table"] = bbcards.compare_table(rows, m["home"], m["away"])
+                chk["result"] = bbcards.plain_result(rows, m["home"], m["away"], settings.MIN_EV)
+                chk["extra"] = bbcards.extra_markets(ev, pin)
+        except Exception as ex:
+            log.warning("tracker price table failed for %s v %s: %s", m.get("home"), m.get("away"), ex)
         chk["pmap"] = pmap
         chk["away"] = ["%s (%+.1f pts)" % ("%s: %s" % (tn._mlabel(p), tn.describe(p)), 100 * moves[self._mk(p)]) for p in away]
         chk["rows"] = picks
@@ -505,11 +517,34 @@ class MatchTracker:
         ml = s.get("ml")
         L += ["SportyBet", "Total: %s | %s: %s%s" % (_f(s.get("total")), home, _f(s.get("spread")),
                                                       (" | Moneyline: %.2f / %.2f" % tuple(ml)) if ml else "")]
-        if pin is not None:
-            gt = None if pin.get("total") is None or s.get("total") is None else s["total"] - pin["total"]
-            gs = None if pin.get("spread") is None or s.get("spread") is None else s["spread"] - pin["spread"]
-            L += ["Gap", "Total: %s | Spread: %s" % (_signed(gt), _signed(gs))]
-        return L
+        return L + self._gap_lines(c)
+
+    @staticmethod
+    def _gap_lines(c):
+        pin, s = c.get("pin"), c["soft"]
+        if pin is None:
+            return []
+        gt = None if pin.get("total") is None or s.get("total") is None else s["total"] - pin["total"]
+        gs = None if pin.get("spread") is None or s.get("spread") is None else s["spread"] - pin["spread"]
+        return ["Gap", "Total: %s | Spread: %s" % (_signed(gt), _signed(gs))]
+
+    def _table_block(self, m, c):
+        """Match card in the tennis / football layout: the closest-to-a-bet sentence, a price table per market, Pinnacle's chances."""
+        e = html.escape
+        L = ["<b>%s</b>" % e(c["result"]), "<i>Price columns: SportyBet | Pinnacle fair | edge</i>"]
+        L += bbcards.table_text(c["table"])
+        if c.get("stale") is not None and c["stale"] < 9999:
+            L.append("Pinnacle price %.0f min old" % c["stale"])
+        ch = bbcards.chances(c["table"])
+        if ch:
+            L.append("<b>Pinnacle's chances</b>")
+            L += ["\u2022 " + e(x) for x in ch]
+        rd = bbcards.match_read(c["table"])
+        if rd:
+            L.append("<i>Read: %s</i>" % e(rd))
+        if c.get("extra"):
+            L.append("Also on SportyBet, not compared (no Pinnacle price to check against): %s." % e(", ".join(c["extra"])))
+        return L + self._gap_lines(c)
 
     def _block(self, m, c, first, log_lines):
         e = html.escape
@@ -538,7 +573,7 @@ class MatchTracker:
                 L.append("<b>Not confirming: the Pinnacle price is %s min old.</b>" % (
                     "over 150" if c["stale"] > 150 else "%.0f" % c["stale"]))
             L.append("")
-        L += self._lines_block(m, c)
+        L += self._table_block(m, c) if (status in ("watch", "seen") and c.get("table") and c.get("result")) else self._lines_block(m, c)
         if first:
             L += ["", "Injuries: %s" % (e(c["inj"]) if c.get("inj") else "none found")]
         else:
