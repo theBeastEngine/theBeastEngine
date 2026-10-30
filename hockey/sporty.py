@@ -19,8 +19,8 @@ from services.client import get_json, HttpError
 log = logging.getLogger("hockey.sporty")
 URL = os.getenv("SPORTYBET_URL", "https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents")
 HEADERS = {"operid": "2", "clientid": "web", "platform": "web", "Referer": "https://www.sportybet.com/ng/"}
-MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "219,223,225")
-PAGE_SIZE = int(os.getenv("HK_SPORTY_PAGE_SIZE", "100"))
+MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "")          # empty = every market of each game; names + ids decide what is used
+PAGE_SIZE = int(os.getenv("HK_SPORTY_PAGE_SIZE", "50"))
 SEEN = Counter()                      # (market id, market name) -> times seen: proof of what the book calls them
 _BAD_NAME = ("3-way", "3 way", "three way", "regulation", "regular", "period", "1st", "2nd", "3rd", "team total", "exact", "odd",
              "even", "both", "race", "first", "last", "draw no bet", "double chance", "overtime only")
@@ -63,6 +63,31 @@ _AH = {"1714": "home", "1715": "away"}
 _OU = {"12": "over", "13": "under"}
 
 
+def _kind(m: dict, mid: str, sp: dict, n_out: int):
+    """'ml' | 'total' | 'ah' | None. Ids 219 / 225 / 223 (the incl.-overtime markets) are taken as they are; any other market is
+    taken only when its NAME says it is the full game including overtime (the ids of the book's hockey markets are not documented)."""
+    if mid == "219":
+        return "ml"
+    if mid == "225":
+        return "total"
+    if mid == "223":
+        return "ah"
+    nm = str(m.get("desc") or m.get("name") or m.get("title") or "").lower()
+    if not any(w in nm for w in ("overtime", "incl. ot", "incl ot", "including ot", "incl. extra", "incl extra")):
+        return None
+    if "handicap" in nm and "hcp" in sp:
+        return "ah"
+    if ("total" in nm or "over/under" in nm) and "total" in sp:
+        return "total"
+    if n_out == 2 and not sp and any(w in nm for w in ("winner", "moneyline", "money line", "to win", "match")):
+        return "ml"
+    return None
+
+
+def seen_top(n: int = 8) -> list:
+    return [(k[0], k[1], c) for k, c in SEEN.most_common(n)]
+
+
 def _ok_name(m: dict) -> bool:
     nm = str(m.get("desc") or m.get("name") or m.get("title") or "").lower()
     return not any(w in nm for w in _BAD_NAME)
@@ -76,16 +101,17 @@ def parse_markets(markets: list) -> dict:
         mid, outs, sp = str(m.get("id")), m.get("outcomes") or [], _spec(m.get("specifier"))
         if len(SEEN) < 300:
             SEEN[(mid, str(m.get("desc") or m.get("name") or "")[:50])] += 1
-        if mid not in ("219", "223", "225") or not _ok_name(m):
+        kind = _kind(m, mid, sp, len(outs))
+        if kind is None or not _ok_name(m):
             continue
-        if mid == "219":
+        if kind == "ml":
             if len(outs) != 2:
                 continue
             for o in outs:
                 s, px = _side(o, _ML, ("home", "away")), _price(o)
                 if s and px:
                     model.ladder_put(ev, "ml", None, s, px)
-        elif mid == "225":
+        elif kind == "total":
             ln = _num(sp.get("total"))
             if ln is None:
                 continue

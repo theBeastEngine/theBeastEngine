@@ -254,7 +254,7 @@ class Engine:
             if elig:
                 chk["hint"] = model.describe(elig[0], m["home"], m["away"])
             chk["table"] = cards.compare_table(cands, m["home"], m["away"], chk.get("soft_ml"))
-            chk["result"] = cards.plain_result(cands, elig, m["home"], m["away"])
+            chk["result"] = cards.plain_result(cands, elig, m["home"], m["away"], sm, pm)
             near = [c for c in cands if c["why_not"]][:3]
             chk["why"] = ["%s: %s" % (model.describe(c, m["home"], m["away"]), c["why_not"]) for c in
                           sorted(near, key=lambda c: -c["ev"])]
@@ -547,12 +547,20 @@ class Engine:
                 ("Odds API credits", "%d of %d today" % (sp.get("oa", 0), int(cfg.f("HK_OA_DAILY_CAP", 600)))),
                 ("OddsPapi calls", "%d of %d today (month-safe)" % (sp.get("pp", 0), int(self._pp_cap()))),
                 ("OddsPapi keys", self._quota_line()),
+                ("Games with SportyBet moneyline", "%d of %d" % (sum(1 for x in ev if "ml" in model.complete(x)), len(ev))),
                 ("Picks", "%d total, %d open, %d graded (%d won)" % (st["total"], st["open"], st["graded"], st["won"])),
                 ("Bankroll", "₦%s" % format(int(round(st["bankroll"])), ","))]
+        from hockey import sporty
+        seen = sporty.seen_top(8)
+        if seen:
+            warn_info = ["SportyBet markets seen: " + "; ".join("%s %s x%d" % (i, n or "?", c) for i, n, c in seen)]
+        else:
+            warn_info = ["SportyBet markets seen: none yet"]
         from core.cards import dots
         text = "\n".join(["\U0001F4CB <b>HOCKEY ENGINE STATUS</b> · %s" % clock(now), cards.RULE,
                           "<i>Is the hockey engine healthy, and what is it watching?</i>", "",
-                          "<pre>%s</pre>" % html.escape(dots(rows))] + [""] * bool(warn) + ["⚠️ <b>%s</b>" % html.escape(w) for w in warn])
+                          "<pre>%s</pre>" % html.escape(dots(rows))] + [""] * bool(warn) + ["⚠️ <b>%s</b>" % html.escape(w) for w in warn]
+                         + ["", "<i>%s</i>" % html.escape(warn_info[0][:900])])
         return text, warn
 
     def hourly(self):

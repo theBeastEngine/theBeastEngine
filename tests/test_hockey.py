@@ -216,3 +216,24 @@ def test_grading_uses_final_score():
     assert eng.grade() >= 1
     p = list(eng.picks["picks"].values())[0]
     assert p["status"] in ("won", "lost") and p["score"] == "4-3"
+
+
+def test_sporty_names_decide_when_ids_differ():
+    ms = [{"id": 999, "desc": "Winner (incl. overtime)", "outcomes": [{"id": "4", "desc": "Home", "odds": "1.9"}, {"id": "5", "desc": "Away", "odds": "1.9"}]},
+          {"id": 998, "desc": "Total Goals (incl. overtime)", "specifier": "total=5.5", "outcomes": [{"id": "12", "desc": "Over 5.5", "odds": "1.9"}, {"id": "13", "desc": "Under 5.5", "odds": "1.9"}]},
+          {"id": 997, "desc": "Handicap (incl. overtime)", "specifier": "hcp=-1.5", "outcomes": [{"id": "1714", "desc": "Home", "odds": "2.5"}, {"id": "1715", "desc": "Away", "odds": "1.5"}]},
+          {"id": 996, "desc": "Total Goals", "specifier": "total=5.5", "outcomes": [{"id": "12", "desc": "Over 5.5", "odds": "1.7"}, {"id": "13", "desc": "Under 5.5", "odds": "2.1"}]}]
+    m = sporty.parse_markets(ms)
+    assert set(m) == {"ml", "total", "ah"} and m["total"][5.5]["over"] == 1.9      # the regulation total (no 'overtime' in its name) is left out
+
+
+def test_no_bet_line_says_what_each_book_has():
+    txt = cards.plain_result([], [], "A", "B", {"ml": {"home": 2, "away": 2}}, {"total": {5.5: {"over": 2, "under": 2}}})
+    assert "SportyBet has: moneyline" in txt and "Pinnacle has: total goals" in txt
+
+
+def test_status_text_shows_markets_seen():
+    eng, feed, pn, res, sent, edits, plain, clock, ev = rig()
+    sporty.parse_markets([{"id": 1, "desc": "1X2", "outcomes": []}])
+    text, warn = eng.status_text(NOW)
+    assert "HOCKEY ENGINE STATUS" in text and "SportyBet markets seen" in text and "moneyline" in text

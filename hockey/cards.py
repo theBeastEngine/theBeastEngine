@@ -109,12 +109,19 @@ def compare_table(cands: list, home: str, away: str, soft_ml=None) -> list:
     return out
 
 
-def plain_result(cands: list, elig: list, home: str, away: str) -> str:
+def _have(mk: dict) -> str:
+    names = {"ml": "moneyline", "ah": "puck line", "total": "total goals"}
+    return ", ".join(names[k] for k in ("ml", "ah", "total") if mk.get(k)) or "nothing"
+
+
+def plain_result(cands: list, elig: list, home: str, away: str, soft: dict = None, pin: dict = None) -> str:
     """One plain sentence: what the engine concludes and how far the closest market is from a bet."""
     if elig:
         return "POSSIBLE BET: %s. Needs a second check to confirm." % model.describe(elig[0], home, away)
     gap = [c for c in cands if c["why_not"]]
     if not gap:
+        if soft is not None and pin is not None:
+            return "NO BET. Nothing comparable on both books yet. SportyBet has: %s. Pinnacle has: %s." % (_have(soft), _have(pin))
         return "NO BET. Nothing comparable on both books yet."
     c = max(gap, key=lambda c: c["ev"])
     what = "%s (SportyBet %.2f, Pinnacle fair %.2f)" % (model.describe(c, home, away), c["odds"], c["fair_odds"])
