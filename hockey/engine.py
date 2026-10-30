@@ -555,7 +555,7 @@ class Engine:
         if seen:
             warn_info = ["SportyBet markets seen: " + "; ".join("%s %s x%d" % (i, n or "?", c) for i, n, c in seen)]
         else:
-            warn_info = ["SportyBet markets seen: none yet"]
+            warn_info = ["SportyBet markets seen: none yet (a probe runs once an hour)"]
         from core.cards import dots
         text = "\n".join(["\U0001F4CB <b>HOCKEY ENGINE STATUS</b> · %s" % clock(now), cards.RULE,
                           "<i>Is the hockey engine healthy, and what is it watching?</i>", "",

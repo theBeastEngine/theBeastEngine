@@ -19,8 +19,8 @@ from services.client import get_json, HttpError
 log = logging.getLogger("hockey.sporty")
 URL = os.getenv("SPORTYBET_URL", "https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents")
 HEADERS = {"operid": "2", "clientid": "web", "platform": "web", "Referer": "https://www.sportybet.com/ng/"}
-MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "")          # empty = every market of each game; names + ids decide what is used
-PAGE_SIZE = int(os.getenv("HK_SPORTY_PAGE_SIZE", "50"))
+MARKET_IDS = os.getenv("HK_SPORTY_MARKET_IDS", "219,223,225")   # the book rejects an empty list with 100 per page (HTTP 422): the all-markets look is a separate small probe
+PAGE_SIZE = int(os.getenv("HK_SPORTY_PAGE_SIZE", "100"))
 SEEN = Counter()                      # (market id, market name) -> times seen: proof of what the book calls them
 _BAD_NAME = ("3-way", "3 way", "three way", "regulation", "regular", "period", "1st", "2nd", "3rd", "team total", "exact", "odd",
              "even", "both", "race", "first", "last", "draw no bet", "double chance", "overtime only")
@@ -174,6 +174,23 @@ class SportyFeed:
         self.events = {}            # id -> event (latest seen)
         self.sweeps = {"upcoming": 0.0, "today": 0.0}
         self.last = dict(pages=0, events=0, error=None)
+        self._probe_t = 0.0
+
+    def probe(self, now: float):
+        """Once an hour: ONE small request for ALL markets of the first games, only to record every market id and name the book
+        really uses for hockey (SEEN, shown in /status). Never feeds the engine and never raises."""
+        if now - self._probe_t < 3600:
+            return
+        self._probe_t = now
+        try:
+            payload, _ = self._get(URL, {"sportId": "sr:sport:4", "marketId": "", "pageSize": 30, "pageNum": 1,
+                                         "todayGames": "false", "timeline": ""}, HEADERS, 20, 1)
+            data = (payload or {}).get("data")
+            for t in (data.get("tournaments") if isinstance(data, dict) else data) or []:
+                for ev in (t.get("events") or [] if isinstance(t, dict) else []):
+                    parse_markets(ev.get("markets"))
+        except Exception as e:
+            log.warning("sportybet hockey market probe failed: %s", str(e)[:120])
 
     def _sweep(self, today: bool) -> int:
         n_ev, pages = 0, 0
@@ -213,6 +230,7 @@ class SportyFeed:
             self.sweeps["upcoming"] = now
             self.sweeps["today"] = now
             n = self._sweep(False)
+            self.probe(now)
             self._drop_old(now)
             return n
 

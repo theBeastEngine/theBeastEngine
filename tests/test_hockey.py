@@ -237,3 +237,21 @@ def test_status_text_shows_markets_seen():
     sporty.parse_markets([{"id": 1, "desc": "1X2", "outcomes": []}])
     text, warn = eng.status_text(NOW)
     assert "HOCKEY ENGINE STATUS" in text and "SportyBet markets seen" in text and "moneyline" in text
+
+
+def test_probe_records_market_names_and_never_raises():
+    seen = []
+
+    def get(url, params, headers, t, r):
+        seen.append(params)
+        return {"data": {"tournaments": [{"events": [{"markets": [{"id": 777, "desc": "Probe Market", "outcomes": []}]}]}]}}, {}
+    f = sporty.SportyFeed(get=get, clock=lambda: NOW)
+    f.probe(NOW)
+    assert seen[0]["marketId"] == "" and ("777", "Probe Market") in sporty.SEEN
+    f.probe(NOW + 10)
+    assert len(seen) == 1                                    # once an hour
+
+    def boom(*a, **k):
+        raise RuntimeError("x")
+    sporty.SportyFeed(get=boom).probe(NOW)
+    assert sporty.MARKET_IDS == "219,223,225"
